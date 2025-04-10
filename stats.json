@@ -1,0 +1,51 @@
+[
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\index.html",
+    "language": "html",
+    "lineCount": 17,
+    "timeSpent": 604507,
+    "lastActiveTime": 1742517603387
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\main.js",
+    "language": "javascript",
+    "lineCount": 34,
+    "timeSpent": 20111,
+    "lastActiveTime": 1742517604127
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\style.css",
+    "language": "postcss",
+    "lineCount": 59,
+    "timeSpent": 1587105,
+    "lastActiveTime": 1742519159699
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\script.py",
+    "language": "python",
+    "lineCount": 4,
+    "timeSpent": 140207,
+    "lastActiveTime": 1742517604671
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\YouHome\\index.cpp",
+    "language": "cpp",
+    "lineCount": 12,
+    "timeSpent": 48800849,
+    "lastActiveTime": 1743067371418
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\testing\\index.ts",
+    "language": "typescript",
+    "lineCount": 24,
+    "timeSpent": 306412,
+    "lastActiveTime": 1744319786469
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\testing\\index.go",
+    "language": "go",
+    "lineCount": 1,
+    "timeSpent": 26499,
+    "lastActiveTime": 1744319785791
+  }
+]
