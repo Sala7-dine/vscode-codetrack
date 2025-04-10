@@ -19,6 +19,14 @@
         "command": "codetrack.showStats",
         "title": "CodeTrack: Show Statistics"
       }
+    ],
+    "keybindings": [
+      {
+        "command": "codetrack.showStats",
+        "key": "ctrl+shift+s",
+        "mac": "cmd+shift+s",
+        "when": "editorTextFocus"
+      }
     ]
   },
   "scripts": {

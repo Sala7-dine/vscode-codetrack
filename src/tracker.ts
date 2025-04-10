@@ -25,6 +25,7 @@ export class CodeTracker implements vscode.Disposable {
     private readonly UPDATE_INTERVAL: number = 1000; // 1 seconde
     private disposables: vscode.Disposable[] = [];
     private intervalId: NodeJS.Timeout;
+    private currentWorkspacePath: string | undefined;
 
     constructor() {
         // Définir le chemin du fichier de statistiques
@@ -38,6 +39,40 @@ export class CodeTracker implements vscode.Disposable {
         
         // Configurer l'intervalle de mise à jour
         this.intervalId = setInterval(() => this.updateCurrentFileTime(), this.UPDATE_INTERVAL);
+        
+        // Déterminer le workspace actuel
+        this.updateCurrentWorkspace();
+    }
+
+    /**
+     * Met à jour le chemin du workspace actuel
+     */
+    private updateCurrentWorkspace(): void {
+        if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+            this.currentWorkspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        } else {
+            this.currentWorkspacePath = undefined;
+        }
+    }
+
+    /**
+     * Vérifie si un fichier appartient au workspace actuel
+     */
+    private isFileInCurrentWorkspace(filePath: string): boolean {
+        if (!this.currentWorkspacePath) {
+            return false;
+        }
+        return filePath.startsWith(this.currentWorkspacePath);
+    }
+
+    /**
+     * Retourne le nom du projet (dossier du workspace)
+     */
+    private getProjectName(): string {
+        if (!this.currentWorkspacePath) {
+            return "Pas de projet ouvert";
+        }
+        return path.basename(this.currentWorkspacePath);
     }
 
     /**
@@ -62,6 +97,13 @@ export class CodeTracker implements vscode.Disposable {
         this.disposables.push(
             vscode.workspace.onDidCloseTextDocument(document => {
                 this.handleDocumentClose(document);
+            })
+        );
+
+        // Suivre les changements de workspace
+        this.disposables.push(
+            vscode.workspace.onDidChangeWorkspaceFolders(() => {
+                this.updateCurrentWorkspace();
             })
         );
 
@@ -246,16 +288,31 @@ export class CodeTracker implements vscode.Disposable {
             // Mettre à jour le temps du fichier courant
             this.updateCurrentFileTime();
             
+            // Mettre à jour le workspace courant
+            this.updateCurrentWorkspace();
+            
             // Préparer le message
             let message = 'Statistiques de CodeTrack:\n\n';
+            
+            // Ajouter le nom du projet
+            message += `Projet: ${this.getProjectName()}\n\n`;
             
             // Ajouter les informations sur l'environnement
             const envInfo = getEnvironmentInfo();
             message += formatEnvironmentInfo(envInfo) + '\n';
             
-            // Informations sur le fichier courant
-            if (this.currentFile && this.fileStats.has(this.currentFile)) {
-                const stats = this.fileStats.get(this.currentFile)!;
+            // Filtrer les statistiques pour le workspace actuel
+            const workspaceStats = new Map<string, FileStats>();
+            
+            this.fileStats.forEach((stats, filePath) => {
+                if (this.isFileInCurrentWorkspace(filePath)) {
+                    workspaceStats.set(filePath, stats);
+                }
+            });
+            
+            // Informations sur le fichier courant (s'il est dans le workspace actuel)
+            if (this.currentFile && workspaceStats.has(this.currentFile)) {
+                const stats = workspaceStats.get(this.currentFile)!;
                 message += `Fichier actuel: ${path.basename(stats.filePath)}\n`;
                 message += `Chemin: ${stats.filePath}\n`;
                 message += `Langage: ${stats.language}\n`;
@@ -263,10 +320,10 @@ export class CodeTracker implements vscode.Disposable {
                 message += `Temps passé: ${this.formatTime(stats.timeSpent)}\n\n`;
             }
             
-            // Statistiques par langage
+            // Statistiques par langage pour le workspace actuel
             const langStats: { [key: string]: { files: number, lines: number, time: number } } = {};
             
-            this.fileStats.forEach(stats => {
+            workspaceStats.forEach(stats => {
                 if (!langStats[stats.language]) {
                     langStats[stats.language] = { files: 0, lines: 0, time: 0 };
                 }
@@ -283,17 +340,17 @@ export class CodeTracker implements vscode.Disposable {
                 message += `  Temps total: ${this.formatTime(langStats[lang].time)}\n`;
             }
             
-            // Totaux
-            let totalFiles = this.fileStats.size;
+            // Totaux pour le workspace actuel
+            let totalFiles = workspaceStats.size;
             let totalLines = 0;
             let totalTime = 0;
             
-            this.fileStats.forEach(stats => {
+            workspaceStats.forEach(stats => {
                 totalLines += stats.lineCount;
                 totalTime += stats.timeSpent;
             });
             
-            message += `\nTotaux:\n`;
+            message += `\nTotaux pour ce projet:\n`;
             message += `Fichiers: ${totalFiles}\n`;
             message += `Lignes: ${totalLines}\n`;
             message += `Temps: ${this.formatTime(totalTime)}`;

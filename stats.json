@@ -38,14 +38,28 @@
     "filePath": "c:\\Users\\LENOVO\\Desktop\\testing\\index.ts",
     "language": "typescript",
     "lineCount": 24,
-    "timeSpent": 306412,
-    "lastActiveTime": 1744319786469
+    "timeSpent": 359029,
+    "lastActiveTime": 1744321240598
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\testing\\index.go",
     "language": "go",
-    "lineCount": 1,
-    "timeSpent": 26499,
-    "lastActiveTime": 1744319785791
+    "lineCount": 3,
+    "timeSpent": 155775,
+    "lastActiveTime": 1744320948690
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\test2\\index.html",
+    "language": "html",
+    "lineCount": 11,
+    "timeSpent": 179836,
+    "lastActiveTime": 1744321229005
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\test2\\style.css",
+    "language": "postcss",
+    "lineCount": 4,
+    "timeSpent": 12518,
+    "lastActiveTime": 1744321022190
   }
 ]
