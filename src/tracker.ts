@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getEnvironmentInfo, formatEnvironmentInfo } from './environment';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 /**
  * Interface pour les statistiques de fichier
@@ -26,11 +28,18 @@ export class CodeTracker implements vscode.Disposable {
     private disposables: vscode.Disposable[] = [];
     private intervalId: NodeJS.Timeout;
     private currentWorkspacePath: string | undefined;
+    private outputChannel: vscode.OutputChannel;
+    private lastTrackTime: number = 0; // Ajouter cette propriété à la classe
 
     constructor() {
         // Définir le chemin du fichier de statistiques
         this.STATS_FILE = path.join(__dirname, '../stats.json');
         
+        // Créer un canal de sortie dédié
+        this.outputChannel = vscode.window.createOutputChannel('CodeTrack');
+        this.outputChannel.appendLine('Extension CodeTrack initialisée');
+        this.outputChannel.appendLine(`Workspace actuel: ${this.getProjectName()}`);
+
         // Charger les statistiques existantes
         this.loadStats();
         
@@ -203,6 +212,129 @@ export class CodeTracker implements vscode.Disposable {
     }
 
     /**
+     * Envoie les données de suivi à l'API via le CLI
+     */
+    private async trackFileActivity(filePath: string, duration: number): Promise<void> {
+        try {
+            // Utiliser this.outputChannel qui est déjà défini dans le constructeur
+            this.outputChannel.appendLine(`Début du suivi d'activité...`);
+            
+            // Chemins vers le CLI
+            let cliPath = path.join(__dirname, 'cli', 'cli.js');
+            
+            // Vérifier si le CLI existe et utiliser un chemin alternatif si nécessaire
+            if (!fs.existsSync(cliPath)) {
+                this.outputChannel.appendLine(`CLI non trouvé à ${cliPath}, recherche d'alternatives...`);
+                
+                // Chemins alternatifs possibles
+                const alternatives = [
+                    path.join(__dirname, '../src/cli/cli.js'),
+                    path.resolve(__dirname, '..', 'cli', 'cli.js')
+                ];
+                
+                for (const alt of alternatives) {
+                    if (fs.existsSync(alt)) {
+                        cliPath = alt;
+                        this.outputChannel.appendLine(`CLI trouvé à ${cliPath}`);
+                        break;
+                    }
+                }
+                
+                if (!fs.existsSync(cliPath)) {
+                    // Si toujours pas trouvé, lister les fichiers dans le dossier parent
+                    const parentDir = path.resolve(__dirname, '..');
+                    this.outputChannel.appendLine(`CLI introuvable. Contenu de ${parentDir}:`);
+                    
+                    if (fs.existsSync(parentDir)) {
+                        fs.readdirSync(parentDir).forEach(file => {
+                            this.outputChannel.appendLine(`  - ${file}`);
+                        });
+                    } else {
+                        this.outputChannel.appendLine(`  Le dossier parent n'existe pas`);
+                    }
+                    
+                    throw new Error(`CLI introuvable dans les chemins connus`);
+                }
+            }
+            
+            // Informations projet et API
+            const projectName = this.getProjectName();
+            const config = vscode.workspace.getConfiguration('codetrack');
+            const apiToken = config.get<string>('apiToken') || '';
+            const apiUrl = config.get<string>('apiUrl') || 'http://localhost:8000/api';
+            
+            this.outputChannel.appendLine(`Données à envoyer:`);
+            this.outputChannel.appendLine(`  Fichier: ${filePath}`);
+            this.outputChannel.appendLine(`  Projet: ${projectName}`);
+            this.outputChannel.appendLine(`  Durée: ${Math.floor(duration / 1000)}s`);
+            this.outputChannel.appendLine(`  API URL: ${apiUrl}`);
+            
+            // Utiliser spawn pour un meilleur contrôle et visibilité
+            const { spawn } = require('child_process');
+            const nodePath = process.execPath; // Chemin de l'exécutable Node.js
+            
+            const args = [
+                cliPath,
+                filePath,
+                projectName,
+                Math.floor(duration / 1000).toString(),
+                apiToken,
+                apiUrl
+            ];
+            
+            this.outputChannel.appendLine(`Exécution: ${nodePath} ${cliPath}`);
+            
+            // Créer le processus
+            const child = spawn(nodePath, args);
+            
+            // Gérer la sortie
+            child.stdout.on('data', (data: Buffer) => {
+                data.toString().split('\n').forEach((line: string) => {
+                    if (line.trim()) {
+                        this.outputChannel.appendLine(`  CLI: ${line.trim()}`);
+                    }
+                });
+            });
+            
+            // Gérer les erreurs
+            child.stderr.on('data', (data: Buffer) => {
+                data.toString().split('\n').forEach((line: string) => {
+                    if (line.trim()) {
+                        this.outputChannel.appendLine(`  Erreur CLI: ${line.trim()}`);
+                    }
+                });
+            });
+            
+            // Attendre la fin du processus
+            return new Promise((resolve, reject) => {
+                child.on('close', (code: number) => {
+                    if (code === 0) {
+                        this.outputChannel.appendLine(`  Terminé avec succès (code ${code})`);
+                        resolve();
+                    } else {
+                        this.outputChannel.appendLine(`  Terminé avec erreur (code ${code})`);
+                        reject(new Error(`Processus terminé avec code ${code}`));
+                    }
+                });
+                
+                child.on('error', (err: Error) => {
+                    this.outputChannel.appendLine(`  Erreur de processus: ${err.message}`);
+                    reject(err);
+                });
+            });
+            
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.outputChannel.appendLine(`Erreur lors du suivi d'activité: ${errorMessage}`);
+            
+            if (error instanceof Error && error.stack) {
+                this.outputChannel.appendLine(`Stack: ${error.stack}`);
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Mettre à jour le temps passé sur le fichier courant
      */
     private updateCurrentFileTime(): void {
@@ -216,10 +348,39 @@ export class CodeTracker implements vscode.Disposable {
                 stats.timeSpent += elapsed;
                 stats.lastActiveTime = now;
                 this.fileStats.set(this.currentFile, stats);
+                
+                // Envoyer les données d'activité à l'API toutes les 5 secondes
+                // basé sur le temps écoulé depuis le dernier envoi, pas l'activité
+                if (now - this.lastTrackTime > 5000) { // 5 secondes
+                    this.lastTrackTime = now;
+                    
+                    this.log(`Activité détectée: ${path.basename(stats.filePath)}`);
+                    this.log(`  Temps écoulé depuis dernier envoi: ${this.formatTime(now - this.lastTrackTime)}`);
+                    this.log(`  Envoi à l'API...`);
+                    
+                    // Envoyer les données
+                    this.trackFileActivity(stats.filePath, 5000) // Toujours 5 secondes pour simplifier
+                        .then(() => {
+                            this.log(`  ✓ Données envoyées avec succès`);
+                        })
+                        .catch(error => {
+                            const errorMessage = error instanceof Error ? error.message : String(error);
+                            this.log(`  ✗ Erreur lors de l'envoi: ${errorMessage}`);
+                        });
+                }
             }
-        } catch (error) {
-            console.error('Erreur lors de la mise à jour du temps :', error);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.log(`Erreur: ${errorMessage}`);
         }
+    }
+
+    /**
+     * Log dans le terminal dédié
+     */
+    private log(message: string): void {
+        const timestamp = new Date().toLocaleTimeString();
+        this.outputChannel.appendLine(`[${timestamp}] ${message}`);
     }
 
     /**
