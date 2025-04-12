@@ -4,6 +4,7 @@ import * as path from 'path';
 import { getEnvironmentInfo, formatEnvironmentInfo } from './environment';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as os from 'os';
 
 /**
  * Interface pour les statistiques de fichier
@@ -216,7 +217,6 @@ export class CodeTracker implements vscode.Disposable {
      */
     private async trackFileActivity(filePath: string, duration: number): Promise<void> {
         try {
-            // Utiliser this.outputChannel qui est déjà défini dans le constructeur
             this.outputChannel.appendLine(`Début du suivi d'activité...`);
             
             // Chemins vers le CLI
@@ -241,18 +241,6 @@ export class CodeTracker implements vscode.Disposable {
                 }
                 
                 if (!fs.existsSync(cliPath)) {
-                    // Si toujours pas trouvé, lister les fichiers dans le dossier parent
-                    const parentDir = path.resolve(__dirname, '..');
-                    this.outputChannel.appendLine(`CLI introuvable. Contenu de ${parentDir}:`);
-                    
-                    if (fs.existsSync(parentDir)) {
-                        fs.readdirSync(parentDir).forEach(file => {
-                            this.outputChannel.appendLine(`  - ${file}`);
-                        });
-                    } else {
-                        this.outputChannel.appendLine(`  Le dossier parent n'existe pas`);
-                    }
-                    
                     throw new Error(`CLI introuvable dans les chemins connus`);
                 }
             }
@@ -263,15 +251,63 @@ export class CodeTracker implements vscode.Disposable {
             const apiToken = config.get<string>('apiToken') || '';
             const apiUrl = config.get<string>('apiUrl') || 'http://localhost:8000/api';
             
-            this.outputChannel.appendLine(`Données à envoyer:`);
-            this.outputChannel.appendLine(`  Fichier: ${filePath}`);
-            this.outputChannel.appendLine(`  Projet: ${projectName}`);
-            this.outputChannel.appendLine(`  Durée: ${Math.floor(duration / 1000)}s`);
-            this.outputChannel.appendLine(`  API URL: ${apiUrl}`);
+            // Générer et sauvegarder les statistiques formatées comme dans showStats()
+            const tempStatsFile = path.join(os.tmpdir(), `codetrack-stats-${Date.now()}.json`);
             
-            // Utiliser spawn pour un meilleur contrôle et visibilité
+            // Création des stats à envoyer (similaire à la fonction showStats)
+            const statsData: any = {
+                project: this.getProjectName(),
+                environment: getEnvironmentInfo(),
+                currentFile: null,
+                languages: {},
+                totals: { files: 0, lines: 0, time: 0 }
+            };
+            
+            // Filtrer les statistiques pour le workspace actuel
+            const workspaceStats = new Map<string, FileStats>();
+            
+            this.fileStats.forEach((stats, filePath) => {
+                if (this.isFileInCurrentWorkspace(filePath)) {
+                    workspaceStats.set(filePath, stats);
+                }
+            });
+            
+            // Informations sur le fichier courant
+            if (this.currentFile && workspaceStats.has(this.currentFile)) {
+                const stats = workspaceStats.get(this.currentFile)!;
+                statsData.currentFile = {
+                    fileName: path.basename(stats.filePath),
+                    filePath: stats.filePath,
+                    language: stats.language,
+                    lineCount: stats.lineCount,
+                    timeSpent: stats.timeSpent
+                };
+            }
+            
+            // Statistiques par langage
+            workspaceStats.forEach(stats => {
+                if (!statsData.languages[stats.language]) {
+                    statsData.languages[stats.language] = { files: 0, lines: 0, time: 0 };
+                }
+                statsData.languages[stats.language].files++;
+                statsData.languages[stats.language].lines += stats.lineCount;
+                statsData.languages[stats.language].time += stats.timeSpent;
+            });
+            
+            // Totaux
+            statsData.totals.files = workspaceStats.size;
+            workspaceStats.forEach(stats => {
+                statsData.totals.lines += stats.lineCount;
+                statsData.totals.time += stats.timeSpent;
+            });
+            
+            // Sauvegarder les statistiques dans un fichier temporaire
+            fs.writeFileSync(tempStatsFile, JSON.stringify(statsData, null, 2));
+            this.outputChannel.appendLine(`Statistiques sauvegardées dans ${tempStatsFile}`);
+            
+            // Exécuter le CLI avec les statistiques complètes
             const { spawn } = require('child_process');
-            const nodePath = process.execPath; // Chemin de l'exécutable Node.js
+            const nodePath = process.execPath;
             
             const args = [
                 cliPath,
@@ -279,7 +315,8 @@ export class CodeTracker implements vscode.Disposable {
                 projectName,
                 Math.floor(duration / 1000).toString(),
                 apiToken,
-                apiUrl
+                apiUrl,
+                tempStatsFile  // Ajout du chemin vers le fichier de statistiques
             ];
             
             this.outputChannel.appendLine(`Exécution: ${nodePath} ${cliPath}`);
@@ -287,7 +324,7 @@ export class CodeTracker implements vscode.Disposable {
             // Créer le processus
             const child = spawn(nodePath, args);
             
-            // Gérer la sortie
+            // Gérer la sortie et les erreurs comme avant...
             child.stdout.on('data', (data: Buffer) => {
                 data.toString().split('\n').forEach((line: string) => {
                     if (line.trim()) {
@@ -296,7 +333,6 @@ export class CodeTracker implements vscode.Disposable {
                 });
             });
             
-            // Gérer les erreurs
             child.stderr.on('data', (data: Buffer) => {
                 data.toString().split('\n').forEach((line: string) => {
                     if (line.trim()) {
@@ -308,6 +344,15 @@ export class CodeTracker implements vscode.Disposable {
             // Attendre la fin du processus
             return new Promise((resolve, reject) => {
                 child.on('close', (code: number) => {
+                    // Supprimer le fichier temporaire
+                    if (fs.existsSync(tempStatsFile)) {
+                        try {
+                            fs.unlinkSync(tempStatsFile);
+                        } catch (err) {
+                            this.outputChannel.appendLine(`  Erreur lors de la suppression du fichier temporaire: ${err}`);
+                        }
+                    }
+                    
                     if (code === 0) {
                         this.outputChannel.appendLine(`  Terminé avec succès (code ${code})`);
                         resolve();

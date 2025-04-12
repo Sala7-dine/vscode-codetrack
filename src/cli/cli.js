@@ -13,9 +13,10 @@ const { saveFailedRequest, processFailedRequests } = require('./retryManager');
  * @param {number} duration - Durée en secondes
  * @param {string} apiToken - Token d'API (optionnel)
  * @param {string} apiUrl - URL de base de l'API
+ * @param {Object} stats - Statistiques complètes (optionnel)
  * @returns {Promise<void>}
  */
-async function trackActivity(filePath, project, duration, apiToken, apiUrl = 'http://127.0.0.1:8000/api') {
+async function trackActivity(filePath, project, duration, apiToken, apiUrl = 'http://127.0.0.1:8000/api', stats = null) {
     // URL complète pour l'endpoint de suivi
     const trackUrl = `${apiUrl}/track`;
     
@@ -35,6 +36,12 @@ async function trackActivity(filePath, project, duration, apiToken, apiUrl = 'ht
         duration: parseInt(duration, 10),
         timestamp: timestamp
     };
+
+    // Ajouter les statistiques complètes si elles sont fournies
+    if (stats) {
+        payload.stats = stats;
+        console.log(`Statistiques complètes incluses dans l'envoi`);
+    }
 
     // Configurer la requête
     const config = {
@@ -76,13 +83,25 @@ async function main() {
         const args = process.argv.slice(2);
         
         if (args.length < 3) {
-            console.error('Usage: node cli.js <filePath> <project> <duration> [apiToken] [apiUrl]');
+            console.error('Usage: node cli.js <filePath> <project> <duration> [apiToken] [apiUrl] [statsFile]');
             process.exit(1);
         }
 
-        const [filePath, project, duration, apiToken, apiUrl] = args;
+        const [filePath, project, duration, apiToken, apiUrl, statsFile] = args;
+        
+        // Charger les statistiques complètes si un fichier est spécifié
+        let stats = null;
+        if (statsFile && fs.existsSync(statsFile)) {
+            try {
+                const statsData = fs.readFileSync(statsFile, 'utf8');
+                stats = JSON.parse(statsData);
+                console.log(`Statistiques chargées depuis ${statsFile}`);
+            } catch (err) {
+                console.error(`Erreur lors du chargement des statistiques: ${err.message}`);
+            }
+        }
 
-        await trackActivity(filePath, project, duration, apiToken, apiUrl);
+        await trackActivity(filePath, project, duration, apiToken, apiUrl, stats);
         await processFailedRequests(apiToken, apiUrl);
         
         process.exit(0);
