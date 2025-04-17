@@ -26,10 +26,15 @@
           "description": "Token API pour l'envoi des données de suivi"
         },
         "codetrack.apiUrl": {
-        "type": "string",
-        "default": "http://localhost:8000/api",
-        "description": "URL de base de l'API CodeTrack"
-      }
+          "type": "string",
+          "default": "http://localhost:8000/api",
+          "description": "URL de base de l'API CodeTrack"
+        },
+        "codetrack.inactivityThreshold": {
+          "type": "number",
+          "default": 2,
+          "description": "Délai d'inactivité en minutes avant que le temps ne soit plus comptabilisé"
+        }
       }
     },
     "commands": [

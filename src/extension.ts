@@ -7,8 +7,11 @@ import { CodeTracker } from './tracker';
 export function activate(context: vscode.ExtensionContext) {
     console.log('Extension "CodeTrack" est maintenant active!');
     
-    // Initialiser le tracker
-    const tracker = new CodeTracker();
+    // Créer une instance du tracker en passant le contexte
+    const tracker = new CodeTracker(context);
+    
+    // Enregistrer le tracker dans les disposables du contexte
+    context.subscriptions.push(tracker);
     
     // Enregistrer les commandes
     let showStatsCommand = vscode.commands.registerCommand('codetrack.showStats', () => {
@@ -17,7 +20,6 @@ export function activate(context: vscode.ExtensionContext) {
     
     // Ajouter nos disposables au contexte
     context.subscriptions.push(showStatsCommand);
-    context.subscriptions.push(tracker);
 }
 
 /**

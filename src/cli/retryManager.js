@@ -56,16 +56,38 @@ async function saveFailedRequest(request) {
             }
         }
         
-        // Ajouter la nouvelle requête échouée
-        logs.push({
-            ...request,
-            failedAt: Date.now()
-        });
+        // Extraire les informations du projet à partir de la requête
+        const projectName = request.data.project;
+        const filePath = request.data.file;
+        
+        // Vérifier si une entrée existe déjà pour ce projet et ce fichier
+        const existingIndex = logs.findIndex(entry => 
+            entry.data.project === projectName && 
+            entry.data.file === filePath
+        );
+        
+        if (existingIndex !== -1) {
+            // Mettre à jour l'entrée existante au lieu d'en créer une nouvelle
+            logs[existingIndex] = {
+                ...request,
+                failedAt: Date.now(),
+                previousAttempts: (logs[existingIndex].previousAttempts || 0) + 1
+            };
+            console.log(`Mise à jour d'une requête existante pour ${filePath} dans le projet ${projectName}`);
+        } else {
+            // Ajouter la nouvelle requête échouée
+            logs.push({
+                ...request,
+                failedAt: Date.now(),
+                previousAttempts: 0
+            });
+            console.log(`Nouvelle requête sauvegardée pour ${filePath} dans ${projectName}`);
+        }
         
         // Sauvegarder les logs mis à jour
         writeJsonFile(LOGS_FILE, logs);
         
-        console.log(`Requête sauvegardée dans ${LOGS_FILE} pour réessai ultérieur`);
+        console.log(`Requête sauvegardée dans ${LOGS_FILE} pour réessai ultérieur (${logs.length} entrées au total)`);
     } catch (error) {
         console.error('Erreur lors de la sauvegarde de la requête échouée:', error.message);
     }
@@ -78,6 +100,9 @@ async function saveFailedRequest(request) {
  * @returns {Promise<void>}
  */
 async function processFailedRequests(apiToken, apiUrl = 'http://127.0.0.1:8000/api') {
+    // Nettoyer les entrées anciennes avant de traiter les requêtes
+    cleanupOldEntries();
+    
     if (!fs.existsSync(LOGS_FILE)) {
         return;
     }
@@ -137,8 +162,36 @@ async function processFailedRequests(apiToken, apiUrl = 'http://127.0.0.1:8000/a
     }
 }
 
+/**
+ * Nettoie les entrées trop anciennes du fichier de logs
+ * @param {number} maxAge - Âge maximum en millisecondes (par défaut: 7 jours)
+ */
+function cleanupOldEntries(maxAge = 7 * 24 * 60 * 60 * 1000) {
+    if (!fs.existsSync(LOGS_FILE)) {
+        return;
+    }
+    
+    try {
+        const logs = readJsonFile(LOGS_FILE);
+        if (!Array.isArray(logs)) {
+            return;
+        }
+        
+        const now = Date.now();
+        const newLogs = logs.filter(entry => (now - entry.failedAt) < maxAge);
+        
+        if (newLogs.length < logs.length) {
+            console.log(`Nettoyage des logs: suppression de ${logs.length - newLogs.length} entrées anciennes`);
+            writeJsonFile(LOGS_FILE, newLogs);
+        }
+    } catch (error) {
+        console.error('Erreur lors du nettoyage des logs:', error.message);
+    }
+}
+
 module.exports = {
     saveFailedRequest,
     processFailedRequests,
-    retryWithBackoff
+    retryWithBackoff,
+    cleanupOldEntries
 };

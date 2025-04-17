@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+import * as child_process from 'child_process';
 import { getEnvironmentInfo, formatEnvironmentInfo } from './environment';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import * as os from 'os';
 
 /**
  * Interface pour les statistiques de fichier
@@ -31,8 +32,20 @@ export class CodeTracker implements vscode.Disposable {
     private currentWorkspacePath: string | undefined;
     private outputChannel: vscode.OutputChannel;
     private lastTrackTime: number = 0; // Ajouter cette propriété à la classe
+    private readonly INACTIVITY_THRESHOLD: number; // Modifié pour être défini dans le constructeur
+    private lastActivityTime = Date.now();
+    private statusBarItem: vscode.StatusBarItem; // Ajouter cette propriété à la classe CodeTracker
+    private extensionContext: vscode.ExtensionContext | undefined; // Ajouter cette propriété pour le contexte d'extension
 
-    constructor() {
+    constructor(context: vscode.ExtensionContext) {
+        // Stocker le contexte de l'extension
+        this.extensionContext = context;
+        
+        // Charger la configuration
+        const config = vscode.workspace.getConfiguration('codetrack');
+        const inactivityMinutes = config.get<number>('inactivityThreshold') || 2;
+        this.INACTIVITY_THRESHOLD = inactivityMinutes * 60 * 1000;
+
         // Définir le chemin du fichier de statistiques
         this.STATS_FILE = path.join(__dirname, '../stats.json');
         
@@ -40,6 +53,15 @@ export class CodeTracker implements vscode.Disposable {
         this.outputChannel = vscode.window.createOutputChannel('CodeTrack');
         this.outputChannel.appendLine('Extension CodeTrack initialisée');
         this.outputChannel.appendLine(`Workspace actuel: ${this.getProjectName()}`);
+
+        // Créer l'élément de barre d'état
+        this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+        this.statusBarItem.text = "$(check) CodeTrack actif";
+        this.statusBarItem.tooltip = "Suivi du temps actif";
+        this.statusBarItem.show();
+        
+        // Ajouter au disposables
+        this.disposables.push(this.statusBarItem);
 
         // Charger les statistiques existantes
         this.loadStats();
@@ -79,10 +101,69 @@ export class CodeTracker implements vscode.Disposable {
      * Retourne le nom du projet (dossier du workspace)
      */
     private getProjectName(): string {
-        if (!this.currentWorkspacePath) {
-            return "Pas de projet ouvert";
+        // Si un workspace est ouvert, l'utiliser comme source principale
+        if (this.currentWorkspacePath) {
+            return path.basename(this.currentWorkspacePath);
         }
-        return path.basename(this.currentWorkspacePath);
+        
+        // Sinon, essayer de récupérer le dernier projet actif
+        const storedProject = this.getCurrentStoredProject();
+        if (storedProject) {
+            return storedProject;
+        }
+        
+        // En dernier recours
+        return "Pas de projet ouvert";
+    }
+
+    /**
+     * Stocke le projet actuel dans le contexte de l'extension
+     */
+    private storeCurrentProject(projectName: string): void {
+        // Si vous avez accès au contexte de l'extension
+        if (this.extensionContext) {
+            this.extensionContext.globalState.update('currentProject', projectName);
+            this.extensionContext.globalState.update('lastActiveTime', Date.now());
+        }
+        
+        // Également stocker dans un fichier local pour plus de sécurité
+        try {
+            const projectInfoPath = path.join(__dirname, '../current-project.json');
+            fs.writeFileSync(projectInfoPath, JSON.stringify({
+                name: projectName,
+                lastActiveTime: Date.now(),
+                path: this.currentWorkspacePath
+            }, null, 2));
+        } catch (error) {
+            this.log(`Erreur lors du stockage des infos du projet: ${error}`);
+        }
+    }
+
+    /**
+     * Récupère le projet actuel depuis le stockage persistant
+     */
+    private getCurrentStoredProject(): string | undefined {
+        // Essayer d'abord via le contexte d'extension
+        if (this.extensionContext) {
+            const stored = this.extensionContext.globalState.get<string>('currentProject');
+            if (stored) {
+                return stored;
+            }
+        }
+        
+        // Sinon, essayer via le fichier local
+        try {
+            const projectInfoPath = path.join(__dirname, '../current-project.json');
+            if (fs.existsSync(projectInfoPath)) {
+                const data = fs.readFileSync(projectInfoPath, 'utf8');
+                const info = JSON.parse(data);
+                return info.name;
+            }
+        } catch (error) {
+            this.log(`Erreur lors de la récupération des infos du projet: ${error}`);
+        }
+        
+        return undefined;
     }
 
     /**
@@ -117,6 +198,19 @@ export class CodeTracker implements vscode.Disposable {
             })
         );
 
+        // Ajouter des écouteurs pour la détection d'activité utilisateur
+        this.disposables.push(
+            vscode.window.onDidChangeTextEditorSelection(() => {
+                this.lastActivityTime = Date.now();
+            })
+        );
+        
+        this.disposables.push(
+            vscode.workspace.onDidSaveTextDocument(() => {
+                this.lastActivityTime = Date.now();
+            })
+        );
+        
         // Vérifier l'éditeur actif lors de l'initialisation
         if (vscode.window.activeTextEditor) {
             this.handleEditorChange(vscode.window.activeTextEditor);
@@ -130,6 +224,9 @@ export class CodeTracker implements vscode.Disposable {
         try {
             // Mettre à jour le temps du fichier précédent
             this.updateCurrentFileTime();
+            
+            // Mettre à jour le temps de dernière activité
+            this.lastActivityTime = Date.now();
 
             // Si pas d'éditeur, ne rien faire de plus
             if (!editor) {
@@ -174,6 +271,9 @@ export class CodeTracker implements vscode.Disposable {
         try {
             const filePath = document.uri.fsPath;
             
+            // Mettre à jour le temps de dernière activité
+            this.lastActivityTime = Date.now();
+            
             // Vérifier si nous suivons déjà ce fichier
             if (this.fileStats.has(filePath)) {
                 const stats = this.fileStats.get(filePath)!;
@@ -199,6 +299,9 @@ export class CodeTracker implements vscode.Disposable {
         try {
             const filePath = document.uri.fsPath;
             
+            // Mettre à jour le temps de dernière activité
+            this.lastActivityTime = Date.now();
+            
             // Si c'est le fichier courant, mettre à jour son temps
             if (this.currentFile === filePath) {
                 this.updateCurrentFileTime();
@@ -215,67 +318,65 @@ export class CodeTracker implements vscode.Disposable {
     /**
      * Envoie les données de suivi à l'API via le CLI
      */
-    private async trackFileActivity(filePath: string, duration: number): Promise<void> {
+    private async trackFileActivity(filePath: string, duration: number, isActive: boolean = true): Promise<void> {
+        // Si l'utilisateur est inactif, ne pas envoyer de données
+        if (!isActive) {
+            this.outputChannel.appendLine(`Utilisateur inactif, aucune donnée envoyée pour ${filePath}`);
+            return Promise.resolve();
+        }
+        
         try {
             this.outputChannel.appendLine(`Début du suivi d'activité...`);
             
-            // Chemins vers le CLI
-            let cliPath = path.join(__dirname, 'cli', 'cli.js');
+            // Définir le chemin vers le CLI
+            let cliPath = path.join(__dirname, '../cli/cli.js');
+            this.log(`Chemin CLI: ${cliPath}`);
             
-            // Vérifier si le CLI existe et utiliser un chemin alternatif si nécessaire
             if (!fs.existsSync(cliPath)) {
-                this.outputChannel.appendLine(`CLI non trouvé à ${cliPath}, recherche d'alternatives...`);
-                
-                // Chemins alternatifs possibles
-                const alternatives = [
-                    path.join(__dirname, '../src/cli/cli.js'),
-                    path.resolve(__dirname, '..', 'cli', 'cli.js')
-                ];
-                
-                for (const alt of alternatives) {
-                    if (fs.existsSync(alt)) {
-                        cliPath = alt;
-                        this.outputChannel.appendLine(`CLI trouvé à ${cliPath}`);
-                        break;
-                    }
-                }
-                
-                if (!fs.existsSync(cliPath)) {
-                    throw new Error(`CLI introuvable dans les chemins connus`);
+                this.log(`ERREUR: Le fichier CLI n'existe pas à l'emplacement ${cliPath}`);
+                // Vérifier dans d'autres emplacements potentiels
+                const alternatePath = path.join(__dirname, '../out/cli/cli.js');
+                if (fs.existsSync(alternatePath)) {
+                    this.log(`CLI trouvé à l'emplacement alternatif: ${alternatePath}`);
+                    cliPath = alternatePath;
+                } else {
+                    throw new Error(`Le fichier CLI n'a pas été trouvé`);
                 }
             }
             
-            // Informations projet et API
-            const projectName = this.getProjectName();
+            // Obtenir les informations de configuration
             const config = vscode.workspace.getConfiguration('codetrack');
             const apiToken = config.get<string>('apiToken') || '';
-            const apiUrl = config.get<string>('apiUrl') || 'http://localhost:8000/api';
+            const apiUrl = config.get<string>('apiUrl') || 'http://127.0.0.1:8000/api';
+            this.log(`URL API: ${apiUrl}`);
             
-            // Générer et sauvegarder les statistiques formatées comme dans showStats()
-            const tempStatsFile = path.join(os.tmpdir(), `codetrack-stats-${Date.now()}.json`);
+            // Informations projet et API
+            const projectName = this.getProjectName();
             
-            // Création des stats à envoyer (similaire à la fonction showStats)
-            const statsData: any = {
-                project: this.getProjectName(),
-                environment: getEnvironmentInfo(),
-                currentFile: null,
-                languages: {},
-                totals: { files: 0, lines: 0, time: 0 }
-            };
+            // Stocker le projet actuel dans une variable globale ou dans le contexte de l'extension
+            this.storeCurrentProject(projectName);
             
             // Filtrer les statistiques pour le workspace actuel
-            const workspaceStats = new Map<string, FileStats>();
-            
-            this.fileStats.forEach((stats, filePath) => {
-                if (this.isFileInCurrentWorkspace(filePath)) {
-                    workspaceStats.set(filePath, stats);
+            const workspaceStats = Array.from(this.fileStats.values())
+                .filter(stats => this.isFileInCurrentWorkspace(stats.filePath));
+
+            // Statistiques par langage
+            const langStats: { [key: string]: { files: number, lines: number, time: number } } = {};
+
+            workspaceStats.forEach(stats => {
+                if (!langStats[stats.language]) {
+                    langStats[stats.language] = { files: 0, lines: 0, time: 0 };
                 }
+                langStats[stats.language].files++;
+                langStats[stats.language].lines += stats.lineCount;
+                langStats[stats.language].time += stats.timeSpent;
             });
-            
-            // Informations sur le fichier courant
-            if (this.currentFile && workspaceStats.has(this.currentFile)) {
-                const stats = workspaceStats.get(this.currentFile)!;
-                statsData.currentFile = {
+
+            // Fichier courant
+            let currentFileStats = null;
+            if (this.currentFile && this.fileStats.has(this.currentFile)) {
+                const stats = this.fileStats.get(this.currentFile)!;
+                currentFileStats = {
                     fileName: path.basename(stats.filePath),
                     filePath: stats.filePath,
                     language: stats.language,
@@ -283,32 +384,36 @@ export class CodeTracker implements vscode.Disposable {
                     timeSpent: stats.timeSpent
                 };
             }
-            
-            // Statistiques par langage
-            workspaceStats.forEach(stats => {
-                if (!statsData.languages[stats.language]) {
-                    statsData.languages[stats.language] = { files: 0, lines: 0, time: 0 };
-                }
-                statsData.languages[stats.language].files++;
-                statsData.languages[stats.language].lines += stats.lineCount;
-                statsData.languages[stats.language].time += stats.timeSpent;
-            });
-            
+
             // Totaux
-            statsData.totals.files = workspaceStats.size;
+            const totalFiles = workspaceStats.length;
+            let totalLines = 0;
+            let totalTime = 0;
+
             workspaceStats.forEach(stats => {
-                statsData.totals.lines += stats.lineCount;
-                statsData.totals.time += stats.timeSpent;
+                totalLines += stats.lineCount;
+                totalTime += stats.timeSpent;
             });
+
+            // Création des stats à envoyer
+            const statsData = {
+                project: projectName,
+                currentProject: projectName,
+                isCurrentlyActive: true,
+                lastActiveTime: Date.now(),
+                environment: getEnvironmentInfo(),
+                currentFile: currentFileStats,
+                languages: langStats,
+                totals: { files: totalFiles, lines: totalLines, time: totalTime }
+            };
+
+            // Ajouter un indicateur "currentProject" aux statistiques
+            const tempStatsFile = path.join(os.tmpdir(), `codetrack-stats-${Date.now()}.json`);
             
-            // Sauvegarder les statistiques dans un fichier temporaire
+            // Enregistrer les statistiques dans un fichier temporaire
             fs.writeFileSync(tempStatsFile, JSON.stringify(statsData, null, 2));
-            this.outputChannel.appendLine(`Statistiques sauvegardées dans ${tempStatsFile}`);
             
-            // Exécuter le CLI avec les statistiques complètes
-            const { spawn } = require('child_process');
-            const nodePath = process.execPath;
-            
+            // Construire les arguments pour le CLI
             const args = [
                 cliPath,
                 filePath,
@@ -316,54 +421,43 @@ export class CodeTracker implements vscode.Disposable {
                 Math.floor(duration / 1000).toString(),
                 apiToken,
                 apiUrl,
-                tempStatsFile  // Ajout du chemin vers le fichier de statistiques
+                tempStatsFile,
+                isActive.toString(),
+                'currentProject=true' // Ajouter cet indicateur supplémentaire
             ];
             
-            this.outputChannel.appendLine(`Exécution: ${nodePath} ${cliPath}`);
+            // Exécuter le CLI avec les arguments
+            const command = process.platform === 'win32' ? 'node' : 'node';
+            this.log(`Exécution de la commande: ${command} ${cliPath} avec les arguments`);
             
-            // Créer le processus
-            const child = spawn(nodePath, args);
+            const childProcess = child_process.spawn(command, args);
             
-            // Gérer la sortie et les erreurs comme avant...
-            child.stdout.on('data', (data: Buffer) => {
-                data.toString().split('\n').forEach((line: string) => {
-                    if (line.trim()) {
-                        this.outputChannel.appendLine(`  CLI: ${line.trim()}`);
-                    }
-                });
+            // Capturer la sortie standard
+            childProcess.stdout.on('data', (data: Buffer) => {
+                const output = data.toString().trim();
+                this.log(`CLI - Sortie: ${output}`);
             });
             
-            child.stderr.on('data', (data: Buffer) => {
-                data.toString().split('\n').forEach((line: string) => {
-                    if (line.trim()) {
-                        this.outputChannel.appendLine(`  Erreur CLI: ${line.trim()}`);
-                    }
-                });
+            // Capturer les erreurs
+            childProcess.stderr.on('data', (data: Buffer) => {
+                const error = data.toString().trim();
+                this.log(`CLI - Erreur: ${error}`);
             });
             
-            // Attendre la fin du processus
-            return new Promise((resolve, reject) => {
-                child.on('close', (code: number) => {
-                    // Supprimer le fichier temporaire
-                    if (fs.existsSync(tempStatsFile)) {
-                        try {
-                            fs.unlinkSync(tempStatsFile);
-                        } catch (err) {
-                            this.outputChannel.appendLine(`  Erreur lors de la suppression du fichier temporaire: ${err}`);
-                        }
-                    }
-                    
+            // Gérer la fin du processus
+            return new Promise<void>((resolve, reject) => {
+                childProcess.on('close', (code: number) => {
                     if (code === 0) {
-                        this.outputChannel.appendLine(`  Terminé avec succès (code ${code})`);
+                        this.log(`CLI terminé avec succès (code ${code})`);
                         resolve();
                     } else {
-                        this.outputChannel.appendLine(`  Terminé avec erreur (code ${code})`);
+                        this.log(`CLI terminé avec erreur (code ${code})`);
                         reject(new Error(`Processus terminé avec code ${code}`));
                     }
                 });
                 
-                child.on('error', (err: Error) => {
-                    this.outputChannel.appendLine(`  Erreur de processus: ${err.message}`);
+                childProcess.on('error', (err) => {
+                    this.log(`Erreur lors de l'exécution du CLI: ${err.message}`);
                     reject(err);
                 });
             });
@@ -371,11 +465,7 @@ export class CodeTracker implements vscode.Disposable {
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.outputChannel.appendLine(`Erreur lors du suivi d'activité: ${errorMessage}`);
-            
-            if (error instanceof Error && error.stack) {
-                this.outputChannel.appendLine(`Stack: ${error.stack}`);
-            }
-            throw error;
+            return Promise.reject(error);
         }
     }
 
@@ -387,31 +477,64 @@ export class CodeTracker implements vscode.Disposable {
             if (this.currentFile && this.fileStats.has(this.currentFile)) {
                 const stats = this.fileStats.get(this.currentFile)!;
                 const now = Date.now();
-                const elapsed = now - stats.lastActiveTime;
+                const timeSinceLastActivity = now - this.lastActivityTime;
                 
-                // Mettre à jour le temps passé et le dernier temps actif
-                stats.timeSpent += elapsed;
-                stats.lastActiveTime = now;
-                this.fileStats.set(this.currentFile, stats);
+                // Vérifier si l'utilisateur est inactif (plus de 2 minutes sans activité)
+                const isInactive = timeSinceLastActivity > this.INACTIVITY_THRESHOLD;
                 
-                // Envoyer les données d'activité à l'API toutes les 5 secondes
-                // basé sur le temps écoulé depuis le dernier envoi, pas l'activité
-                if (now - this.lastTrackTime > 5000) { // 5 secondes
-                    this.lastTrackTime = now;
+                if (isInactive) {
+                    // Si inactif, ne rien ajouter au temps et simplement logger l'inactivité
+                    this.log(`Inactivité détectée (${this.formatTime(timeSinceLastActivity)}). Calcul du temps arrêté.`);
                     
-                    this.log(`Activité détectée: ${path.basename(stats.filePath)}`);
-                    this.log(`  Temps écoulé depuis dernier envoi: ${this.formatTime(now - this.lastTrackTime)}`);
-                    this.log(`  Envoi à l'API...`);
+                    // Mettre à jour seulement le dernier temps actif pour éviter un grand saut
+                    // au retour de l'activité
+                    stats.lastActiveTime = now;
+                    this.fileStats.set(this.currentFile, stats);
+
+                    // Mettre à jour la barre d'état pour indiquer que le suivi est en pause
+                    this.statusBarItem.text = "$(clock) CodeTrack en pause";
+                    this.statusBarItem.tooltip = `Inactif depuis ${this.formatTime(timeSinceLastActivity)} - Le calcul du temps est arrêté`;
                     
-                    // Envoyer les données
-                    this.trackFileActivity(stats.filePath, 5000) // Toujours 5 secondes pour simplifier
-                        .then(() => {
-                            this.log(`  ✓ Données envoyées avec succès`);
-                        })
-                        .catch(error => {
-                            const errorMessage = error instanceof Error ? error.message : String(error);
-                            this.log(`  ✗ Erreur lors de l'envoi: ${errorMessage}`);
-                        });
+                    // Ne pas appeler trackFileActivity quand l'utilisateur est inactif
+                } else {
+                    // Si actif, calculer et ajouter le temps écoulé depuis la dernière mise à jour
+                    const elapsedSinceLastUpdate = now - stats.lastActiveTime;
+                    
+                    // Mettre à jour le temps passé et le dernier temps actif
+                    stats.timeSpent += elapsedSinceLastUpdate;
+                    stats.lastActiveTime = now;
+                    this.fileStats.set(this.currentFile, stats);
+                        
+                    // Log pour le débogage
+                    this.log(`Temps ajouté: ${this.formatTime(elapsedSinceLastUpdate)}`);
+                    
+                    // Envoyer les données d'activité à l'API toutes les 5 secondes
+                    if (now - this.lastTrackTime > 5000) {
+                        this.lastTrackTime = now;
+                        
+                        this.log(`Activité détectée: ${path.basename(stats.filePath)}`);
+                        this.log(`  Envoi à l'API...`);
+                        
+                        // Envoyer les données seulement si l'utilisateur est actif
+                        // Passer "true" explicitement pour l'état d'activité
+                        this.trackFileActivity(stats.filePath, 5000, true)
+                            .then(() => {
+                                this.log(`  ✓ Données envoyées avec succès`);
+                            })
+                            .catch(error => {
+                                const errorMessage = error instanceof Error ? error.message : String(error);
+                                this.log(`  ✗ Erreur lors de l'envoi: ${errorMessage}`);
+                                
+                                // Afficher plus de détails sur l'erreur
+                                if (error instanceof Error) {
+                                    this.log(`  Détails: ${error.stack}`);
+                                }
+                            });
+                    }
+
+                    // Mettre à jour la barre d'état pour indiquer que le suivi est actif
+                    this.statusBarItem.text = "$(check) CodeTrack actif";
+                    this.statusBarItem.tooltip = "Suivi du temps actif";
                 }
             }
         } catch (error: unknown) {
@@ -589,6 +712,9 @@ export class CodeTracker implements vscode.Disposable {
             // Disposer tous les écouteurs d'événements
             this.disposables.forEach(disposable => disposable.dispose());
             this.disposables = [];
+            
+            // Nettoyer la barre d'état
+            this.statusBarItem.dispose();
         } catch (error) {
             console.error('Erreur lors de la désactivation du tracker :', error);
         }

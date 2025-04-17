@@ -2,30 +2,30 @@
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\index.html",
     "language": "html",
-    "lineCount": 17,
-    "timeSpent": 604507,
-    "lastActiveTime": 1742517603387
+    "lineCount": 18,
+    "timeSpent": 1415996,
+    "lastActiveTime": 1744800164900
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\main.js",
     "language": "javascript",
-    "lineCount": 34,
-    "timeSpent": 20111,
-    "lastActiveTime": 1742517604127
+    "lineCount": 41,
+    "timeSpent": 925065,
+    "lastActiveTime": 1744474871879
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\style.css",
     "language": "postcss",
     "lineCount": 75,
-    "timeSpent": 7770373,
-    "lastActiveTime": 1744452137355
+    "timeSpent": 7856182,
+    "lastActiveTime": 1744542016669
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\script.py",
     "language": "python",
-    "lineCount": 7,
-    "timeSpent": 855261,
-    "lastActiveTime": 1744453198517
+    "lineCount": 21,
+    "timeSpent": 13522977,
+    "lastActiveTime": 1744894938395
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\YouHome\\index.cpp",
@@ -37,29 +37,64 @@
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\testing\\index.ts",
     "language": "typescript",
-    "lineCount": 28,
-    "timeSpent": 567822,
-    "lastActiveTime": 1744453545394
+    "lineCount": 39,
+    "timeSpent": 5882109,
+    "lastActiveTime": 1744896609406
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\testing\\index.go",
     "language": "go",
-    "lineCount": 5,
-    "timeSpent": 4647690,
-    "lastActiveTime": 1744453372137
+    "lineCount": 41,
+    "timeSpent": 12561627,
+    "lastActiveTime": 1744896685451
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\test2\\index.html",
     "language": "html",
-    "lineCount": 11,
-    "timeSpent": 179836,
-    "lastActiveTime": 1744321229005
+    "lineCount": 14,
+    "timeSpent": 698485,
+    "lastActiveTime": 1744905967900
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\test2\\style.css",
     "language": "postcss",
-    "lineCount": 4,
-    "timeSpent": 12518,
-    "lastActiveTime": 1744321022190
+    "lineCount": 6,
+    "timeSpent": 2221848,
+    "lastActiveTime": 1744905943109
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\package-lock.json",
+    "language": "json",
+    "lineCount": 7,
+    "timeSpent": 6308,
+    "lastActiveTime": 1744474872303
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Portfoltio\\app\\index.html",
+    "language": "html",
+    "lineCount": 1487,
+    "timeSpent": 74779,
+    "lastActiveTime": 1744554016270
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Portfoltio\\app\\test.html",
+    "language": "html",
+    "lineCount": 181,
+    "timeSpent": 176175,
+    "lastActiveTime": 1744800006989
+  },
+  {
+    "filePath": "Untitled-1",
+    "language": "plaintext",
+    "lineCount": 1,
+    "timeSpent": 2493,
+    "lastActiveTime": 1744801158451
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\testttt\\index.html",
+    "language": "html",
+    "lineCount": 29,
+    "timeSpent": 3307043,
+    "lastActiveTime": 1744883110470
   }
 ]
