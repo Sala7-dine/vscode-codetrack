@@ -167,6 +167,70 @@ export class CodeTracker implements vscode.Disposable {
     }
 
     /**
+     * Récupérer l'API key stockée
+     */
+    private getApiKeyFromStorage(): string | undefined {
+        // D'abord via la configuration VS Code
+        const config = vscode.workspace.getConfiguration('codetrack');
+        const apiKey = config.get<string>('apiKey');
+        if (apiKey) {
+            return apiKey;
+        }
+        
+        // Ensuite via le contexte d'extension
+        if (this.extensionContext) {
+            const storedKey = this.extensionContext.globalState.get<string>('apiKey');
+            if (storedKey) {
+                return storedKey;
+            }
+        }
+        
+        // Enfin via le fichier de configuration local
+        try {
+            const configPath = path.join(__dirname, '../user-config.json');
+            if (fs.existsSync(configPath)) {
+                const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                return config.apiKey;
+            }
+        } catch (error) {
+            this.log(`Erreur lors de la récupération de l'API key: ${error}`);
+        }
+        
+        return undefined;
+    }
+
+    /**
+     * Définir l'API key
+     */
+    public setApiKey(apiKey: string): void {
+        // Sauvegarder dans le contexte d'extension
+        if (this.extensionContext) {
+            this.extensionContext.globalState.update('apiKey', apiKey);
+        }
+        
+        // Sauvegarder dans le fichier local
+        try {
+            const configPath = path.join(__dirname, '../user-config.json');
+            let config: any = {};
+            
+            // Charger la configuration existante si elle existe
+            if (fs.existsSync(configPath)) {
+                config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            }
+            
+            // Mettre à jour l'API key
+            config.apiKey = apiKey;
+            
+            // Écrire le fichier mis à jour
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+            
+            this.log(`API key définie avec succès`);
+        } catch (error) {
+            this.log(`Erreur lors de l'enregistrement de l'API key: ${error}`);
+        }
+    }
+
+    /**
      * Configurer tous les écouteurs d'événements
      */
     private setupEventListeners(): void {
@@ -319,12 +383,6 @@ export class CodeTracker implements vscode.Disposable {
      * Envoie les données de suivi à l'API via le CLI
      */
     private async trackFileActivity(filePath: string, duration: number, isActive: boolean = true): Promise<void> {
-        // Si l'utilisateur est inactif, ne pas envoyer de données
-        if (!isActive) {
-            this.outputChannel.appendLine(`Utilisateur inactif, aucune donnée envoyée pour ${filePath}`);
-            return Promise.resolve();
-        }
-        
         try {
             this.outputChannel.appendLine(`Début du suivi d'activité...`);
             
@@ -348,7 +406,12 @@ export class CodeTracker implements vscode.Disposable {
             const config = vscode.workspace.getConfiguration('codetrack');
             const apiToken = config.get<string>('apiToken') || '';
             const apiUrl = config.get<string>('apiUrl') || 'http://127.0.0.1:8000/api';
+            const apiKey = config.get<string>('apiKey') || this.getApiKeyFromStorage() || '';
+            
             this.log(`URL API: ${apiUrl}`);
+            if (apiKey) {
+                this.log(`API Key disponible: ${apiKey.substring(0, 4)}...`);
+            }
             
             // Informations projet et API
             const projectName = this.getProjectName();
@@ -423,7 +486,8 @@ export class CodeTracker implements vscode.Disposable {
                 apiUrl,
                 tempStatsFile,
                 isActive.toString(),
-                'currentProject=true' // Ajouter cet indicateur supplémentaire
+                'currentProject=true',
+                apiKey  // Ajouter l'API key comme dernier argument
             ];
             
             // Exécuter le CLI avec les arguments

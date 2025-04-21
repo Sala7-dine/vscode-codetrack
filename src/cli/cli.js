@@ -16,9 +16,10 @@ const { saveFailedRequest, processFailedRequests } = require('./retryManager');
  * @param {Object} stats - Statistiques complètes (optionnel)
  * @param {boolean} isActive - Indique si l'utilisateur est actif (optionnel)
  * @param {boolean} isCurrentProject - Indique si c'est le projet actuel (optionnel)
+ * @param {string} apiKey - Clé API utilisateur (optionnel)
  * @returns {Promise<void>}
  */
-async function trackActivity(filePath, project, duration, apiToken, apiUrl = 'http://127.0.0.1:8000/api', stats = null, isActive = true, isCurrentProject = true) {
+async function trackActivity(filePath, project, duration, apiToken, apiUrl = 'http://127.0.0.1:8000/api', stats = null, isActive = true, isCurrentProject = true, apiKey = null) {
     // Ne pas envoyer de données si l'utilisateur est inactif
     if (!isActive) {
         console.log(`Utilisateur inactif, pas d'envoi de données pour ${path.basename(filePath)}`);
@@ -67,6 +68,12 @@ async function trackActivity(filePath, project, duration, apiToken, apiUrl = 'ht
         if (apiToken) {
             config.headers['Authorization'] = `Bearer ${apiToken}`;
         }
+        
+        // Ajouter l'API key si fournie
+        if (apiKey) {
+            config.headers['X-API-KEY'] = apiKey;
+            console.log(`En-tête X-API-KEY ajouté à la requête`);
+        }
 
         // Afficher le payload pour le débogage
         console.log('Envoi des données:', JSON.stringify(payload, null, 2).substring(0, 500) + '...');
@@ -113,11 +120,11 @@ async function main() {
         const args = process.argv.slice(2);
         
         if (args.length < 3) {
-            console.error('Usage: node cli.js <filePath> <project> <duration> [apiToken] [apiUrl] [statsFile] [isActive] [isCurrentProject]');
+            console.error('Usage: node cli.js <filePath> <project> <duration> [apiToken] [apiUrl] [statsFile] [isActive] [isCurrentProject] [apiKey]');
             process.exit(1);
         }
 
-        const [filePath, project, duration, apiToken, apiUrl, statsFile, isActiveStr, isCurrentProjectStr] = args;
+        const [filePath, project, duration, apiToken, apiUrl, statsFile, isActiveStr, isCurrentProjectStr, apiKey] = args;
         
         // Déterminer si l'utilisateur est actif (true par défaut)
         const isActive = isActiveStr ? isActiveStr.toLowerCase() === 'true' : true;
@@ -152,12 +159,12 @@ async function main() {
             }
         }
 
-        // Passer tous les paramètres à la fonction trackActivity
-        await trackActivity(filePath, project, duration, apiToken, apiUrl, stats, isActive, isCurrentProject);
+        // Passer tous les paramètres à la fonction trackActivity, y compris l'API key
+        await trackActivity(filePath, project, duration, apiToken, apiUrl, stats, isActive, isCurrentProject, apiKey);
         
-        // Uniquement traiter les requêtes échouées si l'utilisateur est actif
+        // Également passer l'API key pour les requêtes échouées
         if (isActive) {
-            await processFailedRequests(apiToken, apiUrl);
+            await processFailedRequests(apiToken, apiUrl, apiKey);
         }
         
         process.exit(0);

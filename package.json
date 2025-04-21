@@ -30,6 +30,11 @@
           "default": "http://localhost:8000/api",
           "description": "URL de base de l'API CodeTrack"
         },
+        "codetrack.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Clé API pour l'authentification auprès du serveur"
+        },
         "codetrack.inactivityThreshold": {
           "type": "number",
           "default": 2,
@@ -40,7 +45,15 @@
     "commands": [
       {
         "command": "codetrack.showStats",
-        "title": "CodeTrack: Show Statistics"
+        "title": "CodeTrack: Afficher les statistiques"
+      },
+      {
+        "command": "codetrack.setUserId",
+        "title": "CodeTrack: Définir l'ID utilisateur"
+      },
+      {
+        "command": "codetrack.setApiKey",
+        "title": "CodeTrack: Définir la clé API"
       }
     ],
     "keybindings": [

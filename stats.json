@@ -23,9 +23,9 @@
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\test\\script.py",
     "language": "python",
-    "lineCount": 21,
-    "timeSpent": 13522977,
-    "lastActiveTime": 1744894938395
+    "lineCount": 24,
+    "timeSpent": 14070433,
+    "lastActiveTime": 1745278301698
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\YouHome\\index.cpp",
@@ -44,16 +44,16 @@
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\testing\\index.go",
     "language": "go",
-    "lineCount": 41,
-    "timeSpent": 12561627,
-    "lastActiveTime": 1744896685451
+    "lineCount": 43,
+    "timeSpent": 12690227,
+    "lastActiveTime": 1745068795718
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\test2\\index.html",
     "language": "html",
-    "lineCount": 14,
-    "timeSpent": 698485,
-    "lastActiveTime": 1744905967900
+    "lineCount": 31,
+    "timeSpent": 1282735,
+    "lastActiveTime": 1745245819602
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\test2\\style.css",
@@ -87,14 +87,112 @@
     "filePath": "Untitled-1",
     "language": "plaintext",
     "lineCount": 1,
-    "timeSpent": 2493,
-    "lastActiveTime": 1744801158451
+    "timeSpent": 3934,
+    "lastActiveTime": 1745246596040
   },
   {
     "filePath": "c:\\Users\\LENOVO\\Desktop\\testttt\\index.html",
     "language": "html",
     "lineCount": 29,
-    "timeSpent": 3307043,
-    "lastActiveTime": 1744883110470
+    "timeSpent": 3336729,
+    "lastActiveTime": 1745076392237
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\auth\\Login.jsx",
+    "language": "javascriptreact",
+    "lineCount": 178,
+    "timeSpent": 43708,
+    "lastActiveTime": 1744922439167
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\auth\\Register.jsx",
+    "language": "javascriptreact",
+    "lineCount": 183,
+    "timeSpent": 17727,
+    "lastActiveTime": 1744922439965
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\App.js",
+    "language": "javascript",
+    "lineCount": 51,
+    "timeSpent": 47188,
+    "lastActiveTime": 1744922459647
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\components\\AddQuote.jsx",
+    "language": "javascriptreact",
+    "lineCount": 1,
+    "timeSpent": 3348,
+    "lastActiveTime": 1744922443394
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\layouts\\MainLayout.jsx",
+    "language": "javascriptreact",
+    "lineCount": 201,
+    "timeSpent": 388439,
+    "lastActiveTime": 1744987407834
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\quotes\\FavoriteQuotes.jsx",
+    "language": "javascriptreact",
+    "lineCount": 156,
+    "timeSpent": 632,
+    "lastActiveTime": 1744922445228
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\quotes\\QuoteDetail.jsx",
+    "language": "javascriptreact",
+    "lineCount": 238,
+    "timeSpent": 680,
+    "lastActiveTime": 1744922445949
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\quotes\\QuoteList.jsx",
+    "language": "javascriptreact",
+    "lineCount": 305,
+    "timeSpent": 454,
+    "lastActiveTime": 1744922446450
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\quotes\\QuoteManager.jsx",
+    "language": "javascriptreact",
+    "lineCount": 386,
+    "timeSpent": 903,
+    "lastActiveTime": 1744922447390
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\Youcode\\FormaTion Youcode\\youquote_frontend\\src\\routes\\ProtectedRoute.jsx",
+    "language": "javascriptreact",
+    "lineCount": 56,
+    "timeSpent": 653,
+    "lastActiveTime": 1744922448080
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\BudgetWise\\index.html",
+    "language": "html",
+    "lineCount": 25,
+    "timeSpent": 602871,
+    "lastActiveTime": 1745246194446
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\salah\\index.html",
+    "language": "html",
+    "lineCount": 26,
+    "timeSpent": 453045,
+    "lastActiveTime": 1745273251182
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\aywa\\index.html",
+    "language": "html",
+    "lineCount": 35,
+    "timeSpent": 716907,
+    "lastActiveTime": 1745272083642
+  },
+  {
+    "filePath": "c:\\Users\\LENOVO\\Desktop\\projet\\index.html",
+    "language": "html",
+    "lineCount": 16,
+    "timeSpent": 13656,
+    "lastActiveTime": 1745279033544
   }
 ]

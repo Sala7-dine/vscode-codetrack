@@ -18,6 +18,21 @@ export function activate(context: vscode.ExtensionContext) {
         tracker.showStats();
     });
     
+    context.subscriptions.push(
+        vscode.commands.registerCommand('codetrack.setApiKey', async () => {
+            const apiKey = await vscode.window.showInputBox({
+                placeHolder: 'Entrez votre clé API',
+                prompt: 'Cette clé sera utilisée pour authentifier vos requêtes auprès du serveur',
+                password: true // Masquer l'entrée pour la sécurité
+            });
+            
+            if (apiKey) {
+                tracker.setApiKey(apiKey);
+                vscode.window.showInformationMessage(`Clé API définie avec succès`);
+            }
+        })
+    );
+    
     // Ajouter nos disposables au contexte
     context.subscriptions.push(showStatsCommand);
 }
